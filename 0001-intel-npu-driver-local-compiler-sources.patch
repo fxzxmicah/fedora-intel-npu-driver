@@ -1,0 +1,227 @@
+diff --git a/compiler/compiler_source.cmake b/compiler/compiler_source.cmake
+index c50e839..17bfa35 100644
+--- a/compiler/compiler_source.cmake
++++ b/compiler/compiler_source.cmake
+@@ -12,9 +12,6 @@ else()
+   set(TARGET_DISTRO ${CMAKE_SYSTEM_NAME})
+ endif()
+ 
+-include(ExternalProject)
+-
+-set(OPENVINO_REPOSITORY https://github.com/openvinotoolkit/openvino.git)
+ set(OPENVINO_REVISION f3a30a671d32c8e99cc496f0cc9d0089711fbb82)
+ set(OPENCV_REVISION c1c893ff73581567b6d1a847e8dafc9c052d907c)
+ set(GENAI_REVISION adc69c578f02b9b07aaf0d15ff35747ae3962a52)
+@@ -26,67 +23,40 @@ set(NPU_COMPILER_REVISION da4d79af8cb4bef6a71394bf0e22d998e5fe5b3a)
+ # Compiler might use different OpenVINO revision
+ set(NPU_COMPILER_OPENVINO_REVISION b7f9dbfa7944a1c576b87a4061c298636ae9f2a7)
+ 
+-set(OPENVINO_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/src/openvino")
+-file(MAKE_DIRECTORY ${OPENVINO_SOURCE_DIR})
+-
+-list(APPEND DISABLE_GIT_LFS "filter.lfs.smudge=git-lfs smudge --skip -- %f")
+-list(APPEND DISABLE_GIT_LFS "filter.lfs.process=git-lfs filter-process --skip")
+-
+-ExternalProject_Add(
+-  openvino_source
+-  GIT_REPOSITORY ${OPENVINO_REPOSITORY}
+-  GIT_TAG ${OPENVINO_REVISION}
+-  GIT_CONFIG ${DISABLE_GIT_LFS}
+-  SOURCE_DIR ${OPENVINO_SOURCE_DIR}
+-  PATCH_COMMAND ""
+-  CONFIGURE_COMMAND ""
+-  BUILD_COMMAND ""
+-  INSTALL_COMMAND ""
+-  # Only change the content of source dir in case revision or patch command change
+-  UPDATE_DISCONNECTED TRUE)
+-
+-set(NPU_COMPILER_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/src/npu_compiler")
+-file(MAKE_DIRECTORY ${NPU_COMPILER_SOURCE_DIR})
+-
+-if(NOT NPU_COMPILER_OPENVINO_REVISION STREQUAL OPENVINO_REVISION)
+-  set(NPU_COMPILER_OPENVINO_SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/src/npu_compiler_openvino)
+-  file(MAKE_DIRECTORY ${NPU_COMPILER_OPENVINO_SOURCE_DIR})
++set(LOCAL_OPENVINO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/openvino")
++set(LOCAL_NPU_COMPILER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/npu_compiler")
++set(LOCAL_NPU_COMPILER_OPENVINO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/npu_compiler_openvino")
++
++if(EXISTS "${LOCAL_OPENVINO_SOURCE_DIR}/CMakeLists.txt")
++  set(OPENVINO_SOURCE_DIR "${LOCAL_OPENVINO_SOURCE_DIR}")
++  add_custom_target(openvino_source)
++elseif(ENABLE_OPENVINO_PACKAGE OR NPU_COMPILER_OPENVINO_REVISION STREQUAL OPENVINO_REVISION)
++  message(FATAL_ERROR
++    "Missing required OpenVINO source tree at ${LOCAL_OPENVINO_SOURCE_DIR}. "
++    "Provide the exact OpenVINO sources required by linux-npu-driver instead of "
++    "fetching them during the build.")
++endif()
+ 
++if(EXISTS "${LOCAL_NPU_COMPILER_OPENVINO_SOURCE_DIR}/CMakeLists.txt")
++  set(NPU_COMPILER_OPENVINO_SOURCE_DIR ${LOCAL_NPU_COMPILER_OPENVINO_SOURCE_DIR})
+   set(NPU_COMPILER_BUILD_DEPENDS npu_compiler_openvino_source)
+-
+-  # Copy the local openvino_source and checkout for the compiler the required OpenVINO revision
+-  ExternalProject_Add(
+-    npu_compiler_openvino_source
+-    DEPENDS openvino_source
+-    GIT_REPOSITORY ${OPENVINO_SOURCE_DIR}
+-    GIT_TAG ${NPU_COMPILER_OPENVINO_REVISION}
+-    GIT_CONFIG ${DISABLE_GIT_LFS}
+-    SOURCE_DIR ${NPU_COMPILER_OPENVINO_SOURCE_DIR}
+-    PATCH_COMMAND ""
+-    CONFIGURE_COMMAND ""
+-    BUILD_COMMAND ""
+-    INSTALL_COMMAND ""
+-    # Only change the content of source dir in case revision or patch command change
+-    UPDATE_DISCONNECTED TRUE)
+-else()
++  add_custom_target(npu_compiler_openvino_source)
++elseif(NPU_COMPILER_OPENVINO_REVISION STREQUAL OPENVINO_REVISION)
+   set(NPU_COMPILER_OPENVINO_SOURCE_DIR ${OPENVINO_SOURCE_DIR})
+   set(NPU_COMPILER_BUILD_DEPENDS openvino_source)
++else()
++  message(FATAL_ERROR
++    "Missing required compiler OpenVINO source tree at ${LOCAL_NPU_COMPILER_OPENVINO_SOURCE_DIR}. "
++    "linux-npu-driver requires the dedicated OpenVINO revision ${NPU_COMPILER_OPENVINO_REVISION} "
++    "for the driver compiler build.")
+ endif()
+ 
+-ExternalProject_Add(
+-  npu_compiler_source
+-  GIT_REPOSITORY
+-    https://github.com/openvinotoolkit/npu_compiler.git
+-  GIT_TAG ${NPU_COMPILER_REVISION}
+-  GIT_CONFIG ${DISABLE_GIT_LFS}
+-  SOURCE_DIR ${NPU_COMPILER_SOURCE_DIR}
+-  PATCH_COMMAND
+-    git -C ${NPU_COMPILER_SOURCE_DIR} lfs install &&
+-    git -C ${NPU_COMPILER_SOURCE_DIR} lfs pull &&
+-    git -C ${NPU_COMPILER_SOURCE_DIR}/thirdparty/vpucostmodel lfs install &&
+-    git -C ${NPU_COMPILER_SOURCE_DIR}/thirdparty/vpucostmodel lfs pull
+-  CONFIGURE_COMMAND ""
+-  BUILD_COMMAND ""
+-  INSTALL_COMMAND ""
+-  # Only change the content of source dir in case revision or patch command change
+-  UPDATE_DISCONNECTED TRUE)
++if(EXISTS "${LOCAL_NPU_COMPILER_SOURCE_DIR}/CMakeLists.txt")
++  set(NPU_COMPILER_SOURCE_DIR "${LOCAL_NPU_COMPILER_SOURCE_DIR}")
++  add_custom_target(npu_compiler_source)
++else()
++  message(FATAL_ERROR
++    "Missing required NPU compiler source tree at ${LOCAL_NPU_COMPILER_SOURCE_DIR}. "
++    "Provide the exact npu_compiler sources required by linux-npu-driver instead of "
++    "fetching them during the build.")
++endif()
+diff --git a/compiler/npu_compiler_build.cmake b/compiler/npu_compiler_build.cmake
+index 1269616..6135c75 100644
+--- a/compiler/npu_compiler_build.cmake
++++ b/compiler/npu_compiler_build.cmake
+@@ -28,6 +28,9 @@ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D BUILD_SHARED_LIBS=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_CLANG_FORMAT=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_CLANG_TIDY=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_NCC_STYLE=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_CPPLINT=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_LTO=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_FASTER_BUILD=OFF")
+ # Copied from "how_to_build_driver_compiler" document
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_AUTO=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_AUTO_BATCH=OFF")
+@@ -41,6 +44,11 @@ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_MULTI=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_INTEL_NPU=ON")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_INTEL_NPU_INTERNAL=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_INTEL_NPU_PROTOPIPE=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_NPU_PLUGIN_ENGINE=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_ZEROAPI_BACKEND=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_DRIVER_COMPILER_ADAPTER=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_PROFILING_ITT=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_PROFILING_FIRST_INFERENCE=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_OV_IR_FRONTEND=ON")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_OV_JAX_FRONTEND=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_OV_ONNX_FRONTEND=OFF")
+@@ -51,8 +59,21 @@ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_OV_TF_LITE_FRONTEND=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_PROXY=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_SAMPLES=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_TBBBIND_2_5=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_TBB_RELEASE_ONLY=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_TEMPLATE=OFF")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_TESTS=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_PKGCONFIG_GEN=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_PYTHON=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_PYTHON_PACKAGING=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_WHEEL=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_OPENCV=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_PRIVATE_TESTS=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_NPU_LSP_SERVER=OFF")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_SYSTEM_TBB=ON")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_SYSTEM_PUGIXML=ON")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_SYSTEM_OPENCL=ON")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_SYSTEM_LEVEL_ZERO=ON")
++list(APPEND NPU_COMPILER_CMAKE_ARGS "-D ENABLE_SYSTEM_FLATBUFFERS=ON")
+ # WA in case libgflags is installed in system
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D gflags_DIR=${CMAKE_CURRENT_SOURCE_DIR}/openvino_modules")
+ list(APPEND NPU_COMPILER_CMAKE_ARGS "-D OPENVINO_EXTRA_MODULES=${NPU_COMPILER_SOURCE_DIR}")
+@@ -107,7 +128,7 @@ ExternalProject_Add(
+   BUILD_COMMAND
+     ${CMAKE_COMMAND}
+       --build ${NPU_COMPILER_BINARY_DIR}
+-      --target compilerTest profilingTest vpuxCompilerL0Test loaderTest
++      --target npu_driver_compiler
+       --parallel ${PARALLEL_PROCESSES}
+   INSTALL_COMMAND
+     ${CMAKE_COMMAND}
+diff --git a/third_party/CMakeLists.txt b/third_party/CMakeLists.txt
+index 0f7c3ad..50bed52 100644
+--- a/third_party/CMakeLists.txt
++++ b/third_party/CMakeLists.txt
+@@ -15,8 +15,10 @@ if (ENABLE_NPU_PERFETTO_BUILD)
+ endif()
+ 
+ set(INSTALL_GTEST OFF)
+-add_subdirectory(googletest EXCLUDE_FROM_ALL)
++if(ENABLE_VALIDATION_BUILD)
++  add_subdirectory(googletest EXCLUDE_FROM_ALL)
+ 
+-set(YAML_CPP_INSTALL OFF)
+-set(BUILD_SHARED_LIBS OFF)
+-add_subdirectory(yaml-cpp EXCLUDE_FROM_ALL)
++  set(YAML_CPP_INSTALL OFF)
++  set(BUILD_SHARED_LIBS OFF)
++  add_subdirectory(yaml-cpp EXCLUDE_FROM_ALL)
++endif()
+diff --git a/third_party/cmake/npu_compiler_elf.cmake b/third_party/cmake/npu_compiler_elf.cmake
+index eebf2a6..d97fae5 100644
+--- a/third_party/cmake/npu_compiler_elf.cmake
++++ b/third_party/cmake/npu_compiler_elf.cmake
+@@ -14,9 +14,29 @@ endfunction()
+ get_target_property(FIRMWARE_INCLUDES fw_vpu_api_headers INTERFACE_INCLUDE_DIRECTORIES)
+ include_directories(SYSTEM ${FIRMWARE_INCLUDES})
+ 
+-set(BUILD_SHARED_LIBS ON)
+-add_subdirectory(npu_compiler_elf)
+-unset(BUILD_SHARED_LIBS)
++set(NPU_ELF_LIBRARY_PATH "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/lib/Release/libnpu_elf.a")
++set(NPU_ELF_INCLUDE_DIR "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/include")
++
++if(TARGET npu_compiler_build OR DEFINED NPU_COMPILER_PACKAGE_DIR)
++  add_library(npu_elf INTERFACE)
++  target_include_directories(npu_elf SYSTEM INTERFACE "${NPU_ELF_INCLUDE_DIR}")
++  target_link_libraries(npu_elf INTERFACE "${NPU_ELF_LIBRARY_PATH}")
++
++  if(TARGET npu_compiler_build)
++    add_dependencies(npu_elf npu_compiler_build)
++  endif()
++elseif(ENABLE_NPU_ELF_BUILD)
++  set(BUILD_SHARED_LIBS ON)
++  add_subdirectory(npu_compiler_elf)
++  unset(BUILD_SHARED_LIBS)
++else()
++  message(FATAL_ERROR
++    "Missing libnpu_elf.a at ${NPU_ELF_LIBRARY_PATH}. "
++    "Build the driver compiler package or enable ENABLE_NPU_ELF_BUILD with the "
++    "required npu_compiler_elf sources available.")
++endif()
+ 
+ # TODO: Temporary WA for linker issue with missing -fPIC. This only occurs on Linux
+-set_property(TARGET npu_elf PROPERTY POSITION_INDEPENDENT_CODE ON)
++if(ENABLE_NPU_ELF_BUILD)
++  set_property(TARGET npu_elf PROPERTY POSITION_INDEPENDENT_CODE ON)
++endif()

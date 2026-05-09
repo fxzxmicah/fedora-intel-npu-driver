@@ -1,0 +1,240 @@
+diff --git a/compiler/third_party/npu_compiler/cmake/compile_options_llvm.cmake b/compiler/third_party/npu_compiler/cmake/compile_options_llvm.cmake
+index d6f9d31..950e1d4 100644
+--- a/compiler/third_party/npu_compiler/cmake/compile_options_llvm.cmake
++++ b/compiler/third_party/npu_compiler/cmake/compile_options_llvm.cmake
+@@ -20,6 +20,9 @@ macro(set_llvm_flags)
+     endif()
+     set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
+     set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
++    set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
++    set(LLVM_INCLUDE_RUNTIMES OFF CACHE BOOL "" FORCE)
++    set(LLVM_INCLUDE_UTILS OFF CACHE BOOL "" FORCE)
+     set(LLVM_TARGETS_TO_BUILD "host" CACHE STRING "" FORCE)
+     set(CROSS_TOOLCHAIN_FLAGS_ "" CACHE STRING "" FORCE)
+     set(CROSS_TOOLCHAIN_FLAGS_NATIVE "" CACHE STRING "" FORCE)
+@@ -27,10 +30,13 @@ macro(set_llvm_flags)
+     # we do not use examples and having it enabled
+     # makes cmake complains about long path on Windows
+     set(LLVM_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
++    set(LLVM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
++    set(LLVM_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
++    set(LLVM_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+     set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
+     set(LLVM_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+-    set(LLVM_BUILD_UTILS ON CACHE BOOL "" FORCE)
+-    set(LLVM_INSTALL_UTILS ON CACHE BOOL "" FORCE)
++    set(LLVM_BUILD_UTILS OFF CACHE BOOL "" FORCE)
++    set(LLVM_INSTALL_UTILS OFF CACHE BOOL "" FORCE)
+     set(LLVM_ABI_BREAKING_CHECKS "FORCE_OFF" CACHE STRING "" FORCE)
+ 
+     if(ENABLE_LTO AND NOT MSVC)
+diff --git a/compiler/third_party/npu_compiler/cmake/compiler_commit_hash.cmake b/compiler/third_party/npu_compiler/cmake/compiler_commit_hash.cmake
+index 7617a6d..86d94e1 100644
+--- a/compiler/third_party/npu_compiler/cmake/compiler_commit_hash.cmake
++++ b/compiler/third_party/npu_compiler/cmake/compiler_commit_hash.cmake
+@@ -3,17 +3,23 @@
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ 
+-execute_process(
+-    COMMAND
+-        git rev-parse HEAD
+-    WORKING_DIRECTORY ${REPO_DIR}
+-    OUTPUT_VARIABLE CURRENT_COMMIT_HASH
+-    OUTPUT_STRIP_TRAILING_WHITESPACE
+-    RESULT_VARIABLE ERROR_CODE
+-)
++set(CURRENT_COMMIT_HASH "unknown")
++if(EXISTS "${REPO_DIR}/.git")
++    find_package(Git QUIET)
++    if(Git_FOUND)
++        execute_process(
++            COMMAND
++                ${GIT_EXECUTABLE} rev-parse HEAD
++            WORKING_DIRECTORY ${REPO_DIR}
++            OUTPUT_VARIABLE CURRENT_COMMIT_HASH
++            OUTPUT_STRIP_TRAILING_WHITESPACE
++            RESULT_VARIABLE ERROR_CODE
++        )
+ 
+-if (NOT ${ERROR_CODE} EQUAL 0)
+-    message(FATAL_ERROR "Failed to capture compiler git commit.")
++        if (NOT ${ERROR_CODE} EQUAL 0)
++            set(CURRENT_COMMIT_HASH "unknown")
++        endif()
++    endif()
+ endif()
+ 
+ set(LAST_COMMIT_HASH "")
+diff --git a/compiler/third_party/npu_compiler/cmake/flatbuffers.cmake b/compiler/third_party/npu_compiler/cmake/flatbuffers.cmake
+index 430b68f..e7e5911 100644
+--- a/compiler/third_party/npu_compiler/cmake/flatbuffers.cmake
++++ b/compiler/third_party/npu_compiler/cmake/flatbuffers.cmake
+@@ -4,7 +4,14 @@
+ #
+ 
+ function(vpux_add_flatc_target FLATC_TARGET_NAME)
+-    if(NOT TARGET ${flatc_TARGET} OR NOT flatc_COMMAND)
++    if(NOT flatc_TARGET AND TARGET flatc)
++        set(flatc_TARGET flatc)
++    endif()
++    if(NOT flatc_COMMAND AND flatc_TARGET AND TARGET ${flatc_TARGET})
++        set(flatc_COMMAND $<TARGET_FILE:${flatc_TARGET}>)
++    endif()
++
++    if(NOT flatc_TARGET OR NOT TARGET ${flatc_TARGET} OR NOT flatc_COMMAND)
+         message(FATAL_ERROR "Missing Flatbuffers")
+     endif()
+     set(options)
+diff --git a/compiler/third_party/npu_compiler/cmake/prepare_cost_model_binary.cmake b/compiler/third_party/npu_compiler/cmake/prepare_cost_model_binary.cmake
+index d1204fb..23a0e94 100644
+--- a/compiler/third_party/npu_compiler/cmake/prepare_cost_model_binary.cmake
++++ b/compiler/third_party/npu_compiler/cmake/prepare_cost_model_binary.cmake
+@@ -18,11 +18,6 @@ function(prepare_cost_model_binary SOURCE_FILE HEADER_FILE VARIABLE_NAME)
+         message(FATAL_ERROR "File '${SOURCE_FILE}' does not exist")
+     endif()
+ 
+-    find_package(Git QUIET REQUIRED)
+-    execute_process(
+-        COMMAND ${GIT_EXECUTABLE} lfs pull
+-        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/thirdparty/vpucostmodel")
+-
+     file(READ ${SOURCE_FILE} hex_string HEX)
+     string(LENGTH "${hex_string}" hex_string_length)
+ 
+@@ -30,7 +25,7 @@ function(prepare_cost_model_binary SOURCE_FILE HEADER_FILE VARIABLE_NAME)
+     math(EXPR hex_array_size "${hex_string_length} / 2")
+ 
+     if (hex_array_size LESS "1000")
+-        message(FATAL_ERROR "File '${SOURCE_FILE}' too small, check that git-lfs pull step has been done.")
++        message(FATAL_ERROR "File '${SOURCE_FILE}' too small, check that source archive contains Git LFS content.")
+     endif()
+ 
+     set(content "
+diff --git a/compiler/third_party/npu_compiler/src/vpux_driver_compiler/CMakeLists.txt b/compiler/third_party/npu_compiler/src/vpux_driver_compiler/CMakeLists.txt
+index cfe6455..833368e 100644
+--- a/compiler/third_party/npu_compiler/src/vpux_driver_compiler/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/src/vpux_driver_compiler/CMakeLists.txt
+@@ -28,16 +28,20 @@ endif()
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+ 
+ add_subdirectory(src)
+-add_subdirectory(test)
+-
+-install(
+-    FILES
+-        "${PROJECT_SOURCE_DIR}/src/vpux_driver_compiler/CHANGES.txt"
+-    DESTINATION ${INSTALL_DESTINATION}
+-    COMPONENT ${INSTALL_COMPONENT})
+-
+-install(
+-    FILES
+-        "${PROJECT_SOURCE_DIR}/src/vpux_driver_compiler/README.md"
+-    DESTINATION ${INSTALL_DESTINATION}
+-    COMPONENT ${INSTALL_COMPONENT})
++if(ENABLE_TESTS)
++    add_subdirectory(test)
++endif()
++
++if(NOT BUILD_COMPILER_FOR_DRIVER)
++    install(
++        FILES
++            "${PROJECT_SOURCE_DIR}/src/vpux_driver_compiler/CHANGES.txt"
++        DESTINATION ${INSTALL_DESTINATION}
++        COMPONENT ${INSTALL_COMPONENT})
++
++    install(
++        FILES
++            "${PROJECT_SOURCE_DIR}/src/vpux_driver_compiler/README.md"
++        DESTINATION ${INSTALL_DESTINATION}
++        COMPONENT ${INSTALL_COMPONENT})
++endif()
+diff --git a/compiler/third_party/npu_compiler/src/vpux_driver_compiler/src/vpux_compiler_l0/CMakeLists.txt b/compiler/third_party/npu_compiler/src/vpux_driver_compiler/src/vpux_compiler_l0/CMakeLists.txt
+index 8bb2282..baf2321 100644
+--- a/compiler/third_party/npu_compiler/src/vpux_driver_compiler/src/vpux_compiler_l0/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/src/vpux_driver_compiler/src/vpux_compiler_l0/CMakeLists.txt
+@@ -21,10 +21,11 @@ add_library(${TARGET_NAME}
+         vcl_deserializer.cpp
+ )
+ 
+-find_package(Git REQUIRED)
+-
+ # Use commit info to create compiler version
+ ov_commit_hash(PLUGIN_GIT_COMMIT_HASH ${CMAKE_CURRENT_SOURCE_DIR})
++if(NOT PLUGIN_GIT_COMMIT_HASH)
++    set(PLUGIN_GIT_COMMIT_HASH "unknown")
++endif()
+ string(TIMESTAMP DATE_MAJOR "%m%d")
+ string(TIMESTAMP DATE_MINOR "%H%M%S")
+ set(DRIVER_COMPILER_ID ${CI_BUILD_NUMBER}-${DATE_MAJOR}.${DATE_MINOR}-DCI-${PLUGIN_GIT_COMMIT_HASH})
+diff --git a/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt b/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
+index c75340b..e759c8a 100644
+--- a/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
+@@ -73,7 +73,12 @@ endif()
+ 
+ set(VPUNN_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
+ set(VPUNN_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
++set(VPUNN_BUILD_APPS OFF CACHE BOOL "" FORCE)
+ set(VPUNN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
++set(VPUNN_ENABLE_LOGGING OFF CACHE BOOL "" FORCE)
++set(ENABLE_PYTHON_BINDING OFF CACHE BOOL "" FORCE)
++set(GENERATE_PYTHON_BINDING OFF CACHE BOOL "" FORCE)
++set(VPUNN_BUILD_HTTP_CLIENT OFF CACHE BOOL "" FORCE)
+ set(VPUNN_OPT_LEGACY_ZTILING ON CACHE BOOL "" FORCE)
+ set(VPUNN_OPT_LEGACY_DMA_TH_4 ON CACHE BOOL "" FORCE)
+ set(VPUNN_OPT_LEGACY_DMA_TH_5 OFF CACHE BOOL "" FORCE)
+diff --git a/compiler/third_party/npu_compiler/thirdparty/flatbuffers.cmake b/compiler/third_party/npu_compiler/thirdparty/flatbuffers.cmake
+index 70cdf05..9f073c2 100644
+--- a/compiler/third_party/npu_compiler/thirdparty/flatbuffers.cmake
++++ b/compiler/third_party/npu_compiler/thirdparty/flatbuffers.cmake
+@@ -9,6 +9,33 @@ if(TARGET flatbuffers OR TARGET flatc)
+     # and flatbuffers is already built as part of OpenVINO in case of
+     # building in a single tree
+     message(WARNING "Flatbuffers target present. Possible version mismatch.")
++elseif(ENABLE_SYSTEM_FLATBUFFERS)
++    find_host_package(Flatbuffers REQUIRED NAMES Flatbuffers FlatBuffers flatbuffers NO_CMAKE_FIND_ROOT_PATH)
++
++    if(NOT TARGET flatbuffers)
++        if(TARGET flatbuffers::flatbuffers_shared)
++            add_library(flatbuffers INTERFACE)
++            target_link_libraries(flatbuffers INTERFACE flatbuffers::flatbuffers_shared)
++        elseif(TARGET flatbuffers::flatbuffers)
++            add_library(flatbuffers INTERFACE)
++            target_link_libraries(flatbuffers INTERFACE flatbuffers::flatbuffers)
++        endif()
++    endif()
++
++    if(NOT TARGET flatc AND TARGET flatbuffers::flatc)
++        get_target_property(FLATC_IMPORTED_LOCATION flatbuffers::flatc IMPORTED_LOCATION)
++        if(NOT FLATC_IMPORTED_LOCATION)
++            get_target_property(FLATC_IMPORTED_LOCATION flatbuffers::flatc LOCATION)
++        endif()
++        add_executable(flatc IMPORTED GLOBAL)
++        set_target_properties(flatc PROPERTIES IMPORTED_LOCATION "${FLATC_IMPORTED_LOCATION}")
++    endif()
++
++    if(NOT TARGET flatbuffers OR NOT TARGET flatc OR NOT FLATC_IMPORTED_LOCATION)
++        message(FATAL_ERROR "Internal error: Failed to detect system flatbuffers targets")
++    endif()
++
++    set(flatbuffers_TARGET flatbuffers PARENT_SCOPE)
+ elseif(NOT OpenVINO_SOURCE_DIR)
+     # Using OpenVINO prebuilt developer package
+     set(OPENVINO_INSTALL_DEVELOPER_PACKAGE_DIR "${OpenVINODeveloperPackage_DIR}/..")
+diff --git a/compiler/third_party/npu_compiler/tools/CMakeLists.txt b/compiler/third_party/npu_compiler/tools/CMakeLists.txt
+index 5cd39d5..18944fb 100644
+--- a/compiler/third_party/npu_compiler/tools/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/tools/CMakeLists.txt
+@@ -3,6 +3,11 @@
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ 
++if(BUILD_COMPILER_FOR_DRIVER)
++    add_subdirectory(npureg-tblgen)
++    return()
++endif()
++
+ add_subdirectory(sol-generator)
+ add_subdirectory(query_model)
+ add_subdirectory(infer_tool)
