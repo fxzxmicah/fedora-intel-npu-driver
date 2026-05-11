@@ -5,6 +5,7 @@
 %global npu_compiler_elf_revision 82c444bcb9feb0f55fa33e18fbd711ec35426fba
 %global npu_compiler_llvm_revision cf3934f4e8ada928544a743481e037935a21e857
 %global npu_compiler_vpucostmodel_revision 33ef9a69b4e694ad5bfc521af829a9cc9ce19b4c
+%global level_zero_npu_extensions_revision 42768cc73e74f6d371bd9dd51b1860b07774e7ec
 
 %global debug_package %{nil}
 
@@ -21,6 +22,7 @@ Source2:        https://github.com/openvinotoolkit/openvino/archive/%{npu_compil
 Source3:        https://github.com/openvinotoolkit/npu_compiler_elf/archive/%{npu_compiler_elf_revision}.tar.gz#/npu_compiler_elf-%{npu_compiler_elf_revision}.tar.gz
 Source4:        https://github.com/intel-staging/npu-compiler-llvm/archive/%{npu_compiler_llvm_revision}.tar.gz#/npu-compiler-llvm-%{npu_compiler_llvm_revision}.tar.gz
 Source5:        https://github.com/intel/npu-nn-cost-model/archive/%{npu_compiler_vpucostmodel_revision}.tar.gz#/npu-nn-cost-model-%{npu_compiler_vpucostmodel_revision}.tar.gz
+Source6:        https://github.com/intel/level-zero-npu-extensions/archive/%{level_zero_npu_extensions_revision}.tar.gz#/level-zero-npu-extensions-%{level_zero_npu_extensions_revision}.tar.gz
 
 Patch1:         0001-intel-npu-driver-local-compiler-sources.patch
 Patch2:         0002-intel-npu-driver-openvino-system-flatbuffers.patch
@@ -57,7 +59,7 @@ compilation of OpenVINO IR models through the Level Zero Graph Extension API.
 
 %prep
 %autosetup -N -n linux-npu-driver-%{version}
-%setup -q -T -D -n linux-npu-driver-%{version} -a1 -a2 -a3 -a4 -a5
+%setup -q -T -D -n linux-npu-driver-%{version} -a1 -a2 -a3 -a4 -a5 -a6
 
 mkdir -p compiler/third_party
 mv -T npu_compiler-%{npu_compiler_revision} compiler/third_party/npu_compiler
@@ -65,6 +67,7 @@ mv -T openvino-%{npu_compiler_openvino_revision} compiler/third_party/npu_compil
 mv -T npu_compiler_elf-%{npu_compiler_elf_revision} compiler/third_party/npu_compiler/thirdparty/elf
 mv -T npu-compiler-llvm-%{npu_compiler_llvm_revision} compiler/third_party/npu_compiler/thirdparty/llvm-project
 mv -T npu-nn-cost-model-%{npu_compiler_vpucostmodel_revision} compiler/third_party/npu_compiler/thirdparty/vpucostmodel
+mv -T level-zero-npu-extensions-%{level_zero_npu_extensions_revision} third_party/level-zero-npu-extensions
 
 %autopatch -p1
 

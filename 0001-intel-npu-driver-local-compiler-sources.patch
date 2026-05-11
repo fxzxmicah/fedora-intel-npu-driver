@@ -188,22 +188,33 @@ index 0f7c3ad..50bed52 100644
 +  add_subdirectory(yaml-cpp EXCLUDE_FROM_ALL)
 +endif()
 diff --git a/third_party/cmake/npu_compiler_elf.cmake b/third_party/cmake/npu_compiler_elf.cmake
-index eebf2a6..d97fae5 100644
+index eebf2a6..383e4fc 100644
 --- a/third_party/cmake/npu_compiler_elf.cmake
 +++ b/third_party/cmake/npu_compiler_elf.cmake
-@@ -14,9 +14,29 @@ endfunction()
+@@ -14,9 +14,40 @@ endfunction()
  get_target_property(FIRMWARE_INCLUDES fw_vpu_api_headers INTERFACE_INCLUDE_DIRECTORIES)
  include_directories(SYSTEM ${FIRMWARE_INCLUDES})
  
 -set(BUILD_SHARED_LIBS ON)
 -add_subdirectory(npu_compiler_elf)
 -unset(BUILD_SHARED_LIBS)
-+set(NPU_ELF_LIBRARY_PATH "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/lib/Release/libnpu_elf.a")
-+set(NPU_ELF_INCLUDE_DIR "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/include")
-+
 +if(TARGET npu_compiler_build OR DEFINED NPU_COMPILER_PACKAGE_DIR)
++  if(NOT DEFINED NPU_COMPILER_PACKAGE_DIR)
++    get_target_property(NPU_COMPILER_INCLUDE_DIRS npu_compiler INTERFACE_INCLUDE_DIRECTORIES)
++    list(GET NPU_COMPILER_INCLUDE_DIRS 0 NPU_COMPILER_PACKAGE_DIR)
++  endif()
++
++  set(NPU_ELF_LIBRARY_PATH "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/lib/Release/libnpu_elf.a")
++  set(NPU_ELF_INCLUDE_DIRS
++    "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/core/include"
++    "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include"
++    "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include/common"
++    "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include/3720"
++    "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include/4000"
++    "${NPU_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include/5000")
++
 +  add_library(npu_elf INTERFACE)
-+  target_include_directories(npu_elf SYSTEM INTERFACE "${NPU_ELF_INCLUDE_DIR}")
++  target_include_directories(npu_elf SYSTEM INTERFACE ${NPU_ELF_INCLUDE_DIRS})
 +  target_link_libraries(npu_elf INTERFACE "${NPU_ELF_LIBRARY_PATH}")
 +
 +  if(TARGET npu_compiler_build)
