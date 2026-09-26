@@ -1,0 +1,33 @@
+diff --git a/compiler/third_party/npu_compiler/thirdparty/vpucostmodel/CMakeLists.txt b/compiler/third_party/npu_compiler/thirdparty/vpucostmodel/CMakeLists.txt
+index 1f22fbc..ac26eb9 100644
+--- a/compiler/third_party/npu_compiler/thirdparty/vpucostmodel/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/thirdparty/vpucostmodel/CMakeLists.txt
+@@ -35,6 +35,7 @@ option(VPUNN_BUILD_SHARED_LIB "build shared library" OFF)
+ option(VPUNN_BUILD_EXAMPLES "build examples" OFF)
+ option(VPUNN_BUILD_APPS "build apps" OFF)
+ option(VPUNN_BUILD_TESTS "build tests" ON)
++option(VPUNN_BUILD_HTTP_CLIENT "build HTTP service cost provider" ON)
+ option(VPUNN_ENABLE_LOGGING "enable logging" OFF)
+ option(ENABLE_PYTHON_BINDING "Build the python bindings" OFF)
+ option(GENERATE_PYTHON_BINDING "Generate the python bindings code" OFF)
+@@ -82,16 +83,15 @@ if(VPUNN_OPT_LEGACY_DMA_TH_4)
+     message(STATUS "-- Enable Legacy Gen4 DMA Theoretical")
+ endif()
+ 
+-# HTTP service cost provider is built automatically when its sources are present.
+-# They are stripped from open-source drops (see apps/IPCleanVPUNNTool), in which case
+-# the build transparently omits the client and HttpCostProviderFactory::create() returns nullptr.
+-if(EXISTS "${COST_MODEL_ROOT_DIR}/src/http_client/CMakeLists.txt")
++# HTTP service cost provider requires both the option and its source files.
++# The sources can be stripped from open-source drops (see apps/IPCleanVPUNNTool).
++if(VPUNN_BUILD_HTTP_CLIENT AND EXISTS "${COST_MODEL_ROOT_DIR}/src/http_client/CMakeLists.txt")
+     set(VPUNN_HTTP_CLIENT_AVAILABLE ON)
+     target_compile_definitions(vpunn_common_settings PUBLIC VPUNN_BUILD_HTTP_CLIENT)
+     message(STATUS "-- Enable HTTP service cost provider (sources present)")
+ else()
+     set(VPUNN_HTTP_CLIENT_AVAILABLE OFF)
+-    message(STATUS "-- HTTP service cost provider sources absent, skipping")
++    message(STATUS "-- HTTP service cost provider disabled or sources absent, skipping")
+ endif()
+ 
+ if(VPUNN_OPT_LEGACY_ZTILING)

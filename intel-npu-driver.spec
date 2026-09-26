@@ -1,11 +1,11 @@
-%global driver_version 1.32.1
+%global driver_version 1.38.0
 %global driver_tag v%{driver_version}
-%global npu_compiler_revision da4d79af8cb4bef6a71394bf0e22d998e5fe5b3a
-%global npu_compiler_openvino_revision b7f9dbfa7944a1c576b87a4061c298636ae9f2a7
-%global npu_compiler_elf_revision 82c444bcb9feb0f55fa33e18fbd711ec35426fba
-%global npu_compiler_llvm_revision cf3934f4e8ada928544a743481e037935a21e857
-%global npu_compiler_vpucostmodel_revision 33ef9a69b4e694ad5bfc521af829a9cc9ce19b4c
-%global level_zero_npu_extensions_revision 42768cc73e74f6d371bd9dd51b1860b07774e7ec
+%global npu_compiler_revision 0b38f7d42113ff329ac2bdd33583d123de4ccf2f
+%global npu_compiler_openvino_revision d8047fb380b27a9d5827cb3f22aec7781ae5ac82
+%global npu_compiler_elf_revision d325f45f2cb405b5fa2ff17a30de9469f1641b73
+%global npu_compiler_llvm_revision 8f3977c01be0f24be98b67ef2c911fd82657f30c
+%global npu_compiler_vpucostmodel_revision 4b5da8484d7a5c8cb097486c1248c4d2a753ae4b
+%global level_zero_npu_extensions_revision f9ad3bf89c2418d714aef2e6b96a5aafb12a1971
 
 %global debug_package %{nil}
 
@@ -25,9 +25,19 @@ Source5:        https://github.com/intel/npu-nn-cost-model/archive/%{npu_compile
 Source6:        https://github.com/intel/level-zero-npu-extensions/archive/%{level_zero_npu_extensions_revision}.tar.gz#/level-zero-npu-extensions-%{level_zero_npu_extensions_revision}.tar.gz
 
 Patch1:         0001-intel-npu-driver-local-compiler-sources.patch
-Patch2:         0002-intel-npu-driver-openvino-system-flatbuffers.patch
-Patch3:         0003-intel-npu-driver-openvino-xbyak-system-includes.patch
-Patch4:         0004-intel-npu-driver-npu-compiler-disable-tests.patch
+Patch2:         0002-intel-npu-driver-minimal-build.patch
+Patch3:         0003-intel-npu-driver-compiler-elf-package.patch
+Patch4:         0004-intel-npu-driver-consistent-git-executable.patch
+Patch5:         0005-intel-npu-driver-npu-compiler-source-fallbacks.patch
+Patch6:         0006-intel-npu-driver-npu-compiler-minimal-targets.patch
+Patch7:         0007-intel-npu-driver-npu-compiler-system-flatbuffers.patch
+Patch8:         0008-intel-npu-driver-vpunn-minimal-build.patch
+Patch9:         0009-intel-npu-driver-openvino-system-flatbuffers.patch
+Patch10:        0010-intel-npu-driver-openvino-xbyak-system-includes.patch
+Patch11:        0011-intel-npu-driver-openvino-consistent-git-executable.patch
+Patch12:        0012-intel-npu-driver-openvino-multiclass-nms-move.patch
+Patch13:        0013-intel-npu-driver-npu-elf-git-fallback.patch
+Patch14:        0014-intel-npu-driver-vpunn-optional-http-client.patch
 
 ExclusiveArch:  x86_64
 
@@ -35,7 +45,7 @@ BuildRequires:  cmake
 BuildRequires:  ninja-build
 BuildRequires:  gcc-c++
 BuildRequires:  flatbuffers-compiler
-BuildRequires:  oneapi-level-zero-devel
+BuildRequires:  oneapi-level-zero-devel >= 1.32.0
 BuildRequires:  cmake(xbyak)
 BuildRequires:  cmake(libxml2)
 BuildRequires:  cmake(pugixml)
@@ -81,6 +91,11 @@ mv -T level-zero-npu-extensions-%{level_zero_npu_extensions_revision} third_part
     -DENABLE_NPU_PERFETTO_BUILD=OFF \
     -DENABLE_VALIDATION_BUILD=OFF \
     -DSKIP_UNIT_TESTS=ON \
+    -DENABLE_OFFLINE_COMPILATION_SUPPORT=OFF \
+    -DENABLE_COMPILATION_FLAGS_OVERRIDE=OFF \
+    -DENABLE_NPU_ELF_BUILD=OFF \
+    -DENABLE_NPU_ALT_DEPENDENCY_PATH_OVERRIDE=OFF \
+    -DENABLE_NPU_LOGGING=OFF \
     -DENABLE_TOOLS_BUILD=OFF \
     -DENABLE_OPENVINO_PACKAGE=OFF
 
@@ -99,8 +114,14 @@ rm -f %{buildroot}%{_libdir}/libze_intel_npu.so
 %{_libdir}/libze_intel_npu.so.*
 
 %files compiler
-%{_libdir}/libnpu_driver_compiler.so
+%{_libdir}/libopenvino_intel_npu_compiler.so
+%{_libdir}/libopenvino_intel_npu_compiler_loader.so
 
 %changelog
+* Sun Sep 20 2026 Fxzx micah <48860358+fxzxmicah@users.noreply.github.com> - 1.38.0-1
+- Update to linux-npu-driver 1.38.0.
+- Refresh bundled compiler revisions and Fedora build patches.
+- Disable tests, profiling, tools, and other optional components for a smaller build.
+
 * Thu May 07 2026 Fxzx micah <48860358+fxzxmicah@users.noreply.github.com> - 1.32.1-1
 - Package Intel NPU driver runtime and compiler as separate RPMs.

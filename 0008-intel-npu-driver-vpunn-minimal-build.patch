@@ -1,0 +1,20 @@
+diff --git a/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt b/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
+index c94d9873e..6d21c7acb 100644
+--- a/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
+@@ -62,9 +62,15 @@ if(ENABLE_SYSTEM_FLATBUFFERS)
+     include(flatbuffers.cmake)
+ endif()
+ 
++set(VPUNN_ENABLE_VECTOR_INSTRUCTIONS ON CACHE BOOL "" FORCE)
+ set(VPUNN_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
+ set(VPUNN_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
++set(VPUNN_BUILD_APPS OFF CACHE BOOL "" FORCE)
+ set(VPUNN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
++set(VPUNN_ENABLE_LOGGING OFF CACHE BOOL "" FORCE)
++set(ENABLE_PYTHON_BINDING OFF CACHE BOOL "" FORCE)
++set(GENERATE_PYTHON_BINDING OFF CACHE BOOL "" FORCE)
++set(VPUNN_BUILD_HTTP_CLIENT OFF CACHE BOOL "" FORCE)
+ set(VPUNN_OPT_LEGACY_ZTILING ON CACHE BOOL "" FORCE)
+ set(VPUNN_OPT_LEGACY_DMA_TH_4 ON CACHE BOOL "" FORCE)
+ set(VPUNN_OPT_LEGACY_DMA_TH_5 OFF CACHE BOOL "" FORCE)

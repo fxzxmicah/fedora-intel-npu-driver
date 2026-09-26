@@ -1,0 +1,150 @@
+diff --git a/compiler/third_party/npu_compiler/cmake/flatbuffers.cmake b/compiler/third_party/npu_compiler/cmake/flatbuffers.cmake
+index 430b68fea..cdd3ec086 100644
+--- a/compiler/third_party/npu_compiler/cmake/flatbuffers.cmake
++++ b/compiler/third_party/npu_compiler/cmake/flatbuffers.cmake
+@@ -4,7 +4,14 @@
+ #
+ 
+ function(vpux_add_flatc_target FLATC_TARGET_NAME)
+-    if(NOT TARGET ${flatc_TARGET} OR NOT flatc_COMMAND)
++    if(NOT flatc_TARGET AND TARGET flatc)
++        set(flatc_TARGET flatc)
++    endif()
++    if(NOT flatc_COMMAND AND flatc_TARGET AND TARGET ${flatc_TARGET})
++        set(flatc_COMMAND $<TARGET_FILE:${flatc_TARGET}>)
++    endif()
++
++    if(NOT flatc_TARGET OR NOT TARGET ${flatc_TARGET} OR NOT flatc_COMMAND)
+         message(FATAL_ERROR "Missing Flatbuffers")
+     endif()
+     set(options)
+@@ -59,7 +66,7 @@ function(vpux_add_flatc_target FLATC_TARGET_NAME)
+     add_dependencies(${FLATC_TARGET_NAME} ${FLATC_GEN_TARGET})
+     target_include_directories(${FLATC_TARGET_NAME}
+         SYSTEM INTERFACE
+-            $<TARGET_PROPERTY:flatbuffers,INTERFACE_INCLUDE_DIRECTORIES>
++            ${flatbuffers_INCLUDE_DIRECTORIES}
+             ${FLATC_DST_DIR}
+     )
+ 
+diff --git a/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt b/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
+index f590e1a16..c94d9873e 100644
+--- a/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/thirdparty/CMakeLists.txt
+@@ -56,6 +56,12 @@ endif()
+ # nn cost model
+ #
+ 
++if(ENABLE_SYSTEM_FLATBUFFERS)
++    # VPUNN reuses parent-provided FlatBuffers targets when available. Create
++    # system-backed compatibility aliases before configuring that subproject.
++    include(flatbuffers.cmake)
++endif()
++
+ set(VPUNN_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
+ set(VPUNN_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+ set(VPUNN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+@@ -110,4 +116,6 @@ endif()
+ # flatbuffers
+ #
+ 
+-include(flatbuffers.cmake)
++if(NOT ENABLE_SYSTEM_FLATBUFFERS)
++    include(flatbuffers.cmake)
++endif()
+diff --git a/compiler/third_party/npu_compiler/thirdparty/flatbuffers.cmake b/compiler/third_party/npu_compiler/thirdparty/flatbuffers.cmake
+index 70cdf0586..4cbf75cff 100644
+--- a/compiler/third_party/npu_compiler/thirdparty/flatbuffers.cmake
++++ b/compiler/third_party/npu_compiler/thirdparty/flatbuffers.cmake
+@@ -4,11 +4,51 @@
+ #
+ 
+ 
+-if(TARGET flatbuffers OR TARGET flatc)
++if(TARGET flatbuffers AND TARGET flatc)
+     # we are building NPU plugin via -DOPENVINO_EXTRA_MODULES
+     # and flatbuffers is already built as part of OpenVINO in case of
+     # building in a single tree
+-    message(WARNING "Flatbuffers target present. Possible version mismatch.")
++    message(STATUS "FlatBuffers targets provided by the parent project")
++elseif(ENABLE_SYSTEM_FLATBUFFERS)
++    set(_flatbuffers_targets_before_find)
++    foreach(_target IN ITEMS flatbuffers::flatbuffers_shared flatbuffers::flatbuffers flatbuffers::flatc)
++        if(TARGET "${_target}")
++            list(APPEND _flatbuffers_targets_before_find "${_target}")
++        endif()
++    endforeach()
++
++    find_host_package(Flatbuffers REQUIRED NAMES Flatbuffers FlatBuffers flatbuffers NO_CMAKE_FIND_ROOT_PATH)
++
++    # Imported targets are normally visible only in the directory in which
++    # find_package() created them and below it. Promote targets created here so
++    # compiler source directories added later can use the same package.
++    foreach(_target IN ITEMS flatbuffers::flatbuffers_shared flatbuffers::flatbuffers flatbuffers::flatc)
++        if(TARGET "${_target}" AND NOT "${_target}" IN_LIST _flatbuffers_targets_before_find)
++            get_target_property(_aliased_target "${_target}" ALIASED_TARGET)
++            if(NOT _aliased_target)
++                get_target_property(_is_imported "${_target}" IMPORTED)
++                if(_is_imported)
++                    set_property(TARGET "${_target}" PROPERTY IMPORTED_GLOBAL TRUE)
++                endif()
++            endif()
++        endif()
++    endforeach()
++
++    if(NOT TARGET flatbuffers)
++        if(TARGET flatbuffers::flatbuffers_shared)
++            add_library(flatbuffers ALIAS flatbuffers::flatbuffers_shared)
++        elseif(TARGET flatbuffers::flatbuffers)
++            add_library(flatbuffers ALIAS flatbuffers::flatbuffers)
++        endif()
++    endif()
++
++    if(NOT TARGET flatc AND TARGET flatbuffers::flatc)
++        add_executable(flatc ALIAS flatbuffers::flatc)
++    endif()
++
++    if(NOT TARGET flatbuffers OR NOT TARGET flatc)
++        message(FATAL_ERROR "Internal error: Failed to detect system flatbuffers targets")
++    endif()
+ elseif(NOT OpenVINO_SOURCE_DIR)
+     # Using OpenVINO prebuilt developer package
+     set(OPENVINO_INSTALL_DEVELOPER_PACKAGE_DIR "${OpenVINODeveloperPackage_DIR}/..")
+@@ -39,7 +79,34 @@ else()
+     endif()
+ endif()
+ 
+-set(flatc_TARGET flatc)
+-set(flatc_COMMAND $<TARGET_FILE:flatc>)
++if(TARGET flatbuffers::flatbuffers_shared)
++    set(flatbuffers_TARGET flatbuffers::flatbuffers_shared)
++elseif(TARGET flatbuffers::flatbuffers)
++    set(flatbuffers_TARGET flatbuffers::flatbuffers)
++elseif(TARGET flatbuffers)
++    set(flatbuffers_TARGET flatbuffers)
++else()
++    message(FATAL_ERROR "Missing FlatBuffers library target")
++endif()
++
++get_target_property(flatbuffers_INCLUDE_DIRECTORIES
++    "${flatbuffers_TARGET}" INTERFACE_INCLUDE_DIRECTORIES)
++if(NOT flatbuffers_INCLUDE_DIRECTORIES)
++    message(FATAL_ERROR
++        "FlatBuffers target ${flatbuffers_TARGET} does not provide interface include directories")
++endif()
++list(REMOVE_ITEM flatbuffers_INCLUDE_DIRECTORIES
++    ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
++
++if(TARGET flatbuffers::flatc)
++    set(flatc_TARGET flatbuffers::flatc)
++elseif(TARGET flatc)
++    set(flatc_TARGET flatc)
++else()
++    message(FATAL_ERROR "Missing FlatBuffers compiler target")
++endif()
++
++set(flatbuffers_TARGET "${flatbuffers_TARGET}" PARENT_SCOPE)
++set(flatbuffers_INCLUDE_DIRECTORIES "${flatbuffers_INCLUDE_DIRECTORIES}" PARENT_SCOPE)
+ set(flatc_TARGET "${flatc_TARGET}" PARENT_SCOPE)
+-set(flatc_COMMAND "${flatc_COMMAND}" PARENT_SCOPE)
++set(flatc_COMMAND "$<TARGET_FILE:${flatc_TARGET}>" PARENT_SCOPE)

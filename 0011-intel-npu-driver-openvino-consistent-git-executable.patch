@@ -1,0 +1,47 @@
+diff --git a/compiler/third_party/npu_compiler_openvino/cmake/developer_package/download/download_and_apply.cmake b/compiler/third_party/npu_compiler_openvino/cmake/developer_package/download/download_and_apply.cmake
+index 10b717e416..dfcdfb2ed0 100644
+--- a/compiler/third_party/npu_compiler_openvino/cmake/developer_package/download/download_and_apply.cmake
++++ b/compiler/third_party/npu_compiler_openvino/cmake/developer_package/download/download_and_apply.cmake
+@@ -31,8 +31,9 @@ function (DownloadAndApply URL apply_to sha256)
+     endif()
+ 
+ if (NOT MINGW)
+-    execute_process(COMMAND git apply --verbose  ${patch_name}
+-      WORKING_DIRECTORY ${apply_dir}
++    find_package(Git REQUIRED)
++    execute_process(COMMAND "${GIT_EXECUTABLE}" apply --verbose "${patch_name}"
++      WORKING_DIRECTORY "${apply_dir}"
+       RESULT_VARIABLE rv
+       ERROR_VARIABLE err)
+ else()
+diff --git a/compiler/third_party/npu_compiler_openvino/src/plugins/intel_npu/tools/protopipe/CMakeLists.txt b/compiler/third_party/npu_compiler_openvino/src/plugins/intel_npu/tools/protopipe/CMakeLists.txt
+index 481cd19d49..4a2836f73a 100644
+--- a/compiler/third_party/npu_compiler_openvino/src/plugins/intel_npu/tools/protopipe/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler_openvino/src/plugins/intel_npu/tools/protopipe/CMakeLists.txt
+@@ -5,11 +5,21 @@
+ 
+ set(TARGET_NAME protopipe)
+ 
+-execute_process(
+-  COMMAND git rev-parse --short HEAD
+-  OUTPUT_VARIABLE GIT_SHA
+-  OUTPUT_STRIP_TRAILING_WHITESPACE
+-)
++set(GIT_SHA unknown)
++find_package(Git QUIET)
++if(Git_FOUND)
++  execute_process(
++    COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
++    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
++    OUTPUT_VARIABLE GIT_SHA
++    OUTPUT_STRIP_TRAILING_WHITESPACE
++    RESULT_VARIABLE GIT_RESULT
++    ERROR_QUIET
++  )
++  if(NOT GIT_RESULT EQUAL 0)
++    set(GIT_SHA unknown)
++  endif()
++endif()
+ 
+ configure_file(
+   ${CMAKE_CURRENT_SOURCE_DIR}/version.hpp.in

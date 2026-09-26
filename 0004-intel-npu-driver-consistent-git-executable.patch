@@ -1,0 +1,74 @@
+diff --git a/compiler/compiler_source.cmake b/compiler/compiler_source.cmake
+index febc62e..0eea453 100644
+--- a/compiler/compiler_source.cmake
++++ b/compiler/compiler_source.cmake
+@@ -92,21 +92,25 @@ if(EXISTS "${LOCAL_NPU_COMPILER_SOURCE_DIR}/CMakeLists.txt")
+   set(NPU_COMPILER_SOURCE_DIR "${LOCAL_NPU_COMPILER_SOURCE_DIR}")
+   add_custom_target(npu_compiler_source)
+ else()
+-ExternalProject_Add(
+-  npu_compiler_source
+-  GIT_REPOSITORY
+-    https://github.com/openvinotoolkit/npu_compiler.git
+-  GIT_TAG ${NPU_COMPILER_REVISION}
+-  GIT_CONFIG ${DISABLE_GIT_LFS}
+-  SOURCE_DIR ${NPU_COMPILER_SOURCE_DIR}
+-  PATCH_COMMAND
+-    git -C ${NPU_COMPILER_SOURCE_DIR} lfs install &&
+-    git -C ${NPU_COMPILER_SOURCE_DIR} lfs pull &&
+-    git -C ${NPU_COMPILER_SOURCE_DIR}/thirdparty/vpucostmodel lfs install &&
+-    git -C ${NPU_COMPILER_SOURCE_DIR}/thirdparty/vpucostmodel lfs pull
+-  CONFIGURE_COMMAND ""
+-  BUILD_COMMAND ""
+-  INSTALL_COMMAND ""
+-  # Only change the content of source dir in case revision or patch command change
+-  UPDATE_DISCONNECTED TRUE)
++  find_package(Git REQUIRED)
++  ExternalProject_Add(
++    npu_compiler_source
++    GIT_REPOSITORY
++      https://github.com/openvinotoolkit/npu_compiler.git
++    GIT_TAG ${NPU_COMPILER_REVISION}
++    GIT_CONFIG ${DISABLE_GIT_LFS}
++    SOURCE_DIR ${NPU_COMPILER_SOURCE_DIR}
++    PATCH_COMMAND
++      ${GIT_EXECUTABLE} -C ${NPU_COMPILER_SOURCE_DIR} lfs install
++    COMMAND
++      ${GIT_EXECUTABLE} -C ${NPU_COMPILER_SOURCE_DIR} lfs pull
++    COMMAND
++      ${GIT_EXECUTABLE} -C ${NPU_COMPILER_SOURCE_DIR}/thirdparty/vpucostmodel lfs install
++    COMMAND
++      ${GIT_EXECUTABLE} -C ${NPU_COMPILER_SOURCE_DIR}/thirdparty/vpucostmodel lfs pull
++    CONFIGURE_COMMAND ""
++    BUILD_COMMAND ""
++    INSTALL_COMMAND ""
++    # Only change the content of source dir in case revision or patch command change
++    UPDATE_DISCONNECTED TRUE)
+ endif()
+diff --git a/compiler/openvino_build.cmake b/compiler/openvino_build.cmake
+index 333212a..7a64f33 100644
+--- a/compiler/openvino_build.cmake
++++ b/compiler/openvino_build.cmake
+@@ -6,6 +6,8 @@ if(NOT ENABLE_OPENVINO_PACKAGE)
+   return()
+ endif()
+ 
++find_package(Git REQUIRED)
++
+ include(compiler_source.cmake)
+ 
+ string(SUBSTRING ${OPENVINO_REVISION} 0 8 OPENVINO_REVISION_SHORT)
+@@ -219,10 +221,10 @@ add_custom_target(
+     cp -d ${SAMPLES_APPS_BUILD_DIR}/intel64/classification_sample_async ${SAMPLES_APPS_PACKAGE_DIR}/ &&
+     cp -d ${SAMPLES_APPS_BUILD_DIR}/intel64/hello_classification ${SAMPLES_APPS_PACKAGE_DIR}/ &&
+     cp -d ${SAMPLES_APPS_BUILD_DIR}/intel64/hello_query_device ${SAMPLES_APPS_PACKAGE_DIR}/ &&
+-    git -C ${OPENCV_SOURCE_DIR} rev-list --max-count=1 HEAD > ${OPENVINO_PACKAGE_DIR}/opencv_sha &&
+-    git -C ${OPENVINO_SOURCE_DIR} rev-list --max-count=1 HEAD > ${OPENVINO_PACKAGE_DIR}/openvino_sha &&
++    ${GIT_EXECUTABLE} -C ${OPENCV_SOURCE_DIR} rev-list --max-count=1 HEAD > ${OPENVINO_PACKAGE_DIR}/opencv_sha &&
++    ${GIT_EXECUTABLE} -C ${OPENVINO_SOURCE_DIR} rev-list --max-count=1 HEAD > ${OPENVINO_PACKAGE_DIR}/openvino_sha &&
+     echo ${OPENVINO_PACKAGE_NAME} > ${OPENVINO_PACKAGE_DIR}/build_version &&
+-    echo `git -C ${OPENVINO_SOURCE_DIR} rev-parse HEAD` `git -C ${OPENVINO_SOURCE_DIR} config --local --get remote.origin.url` > ${OPENVINO_PACKAGE_DIR}/manifest.txt
++    echo `${GIT_EXECUTABLE} -C ${OPENVINO_SOURCE_DIR} rev-parse HEAD` `${GIT_EXECUTABLE} -C ${OPENVINO_SOURCE_DIR} config --local --get remote.origin.url` > ${OPENVINO_PACKAGE_DIR}/manifest.txt
+   DEPENDS openvino_build opencv_build sample_apps_build single_image_test_build)
+ 
+ set(OPENVINO_PACKAGE_DEPS copy_to_openvino_package)
