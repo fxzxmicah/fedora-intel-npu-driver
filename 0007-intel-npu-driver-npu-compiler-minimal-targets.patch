@@ -1,0 +1,82 @@
+diff --git a/compiler/third_party/npu_compiler/cmake/compile_options_llvm.cmake b/compiler/third_party/npu_compiler/cmake/compile_options_llvm.cmake
+index 54dbadfcc..94f84e080 100644
+--- a/compiler/third_party/npu_compiler/cmake/compile_options_llvm.cmake
++++ b/compiler/third_party/npu_compiler/cmake/compile_options_llvm.cmake
+@@ -20,6 +20,9 @@ macro(set_llvm_flags)
+     endif()
+     set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
+     set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
++    set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
++    set(LLVM_INCLUDE_RUNTIMES OFF CACHE BOOL "" FORCE)
++    set(LLVM_INCLUDE_UTILS OFF CACHE BOOL "" FORCE)
+     
+     # Note: When building with UB sanitizer, certain ARM-specific symbols
+     # are not found by the linker, so we need to also build ARM libraries.
+@@ -37,10 +40,13 @@ macro(set_llvm_flags)
+     # we do not use examples and having it enabled
+     # makes cmake complains about long path on Windows
+     set(LLVM_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
++    set(LLVM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
++    set(LLVM_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
++    set(LLVM_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+     set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
+     set(LLVM_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+-    set(LLVM_BUILD_UTILS ON CACHE BOOL "" FORCE)
+-    set(LLVM_INSTALL_UTILS ON CACHE BOOL "" FORCE)
++    set(LLVM_BUILD_UTILS OFF CACHE BOOL "" FORCE)
++    set(LLVM_INSTALL_UTILS OFF CACHE BOOL "" FORCE)
+     set(LLVM_ABI_BREAKING_CHECKS "FORCE_OFF" CACHE STRING "" FORCE)
+ 
+     if(ENABLE_LTO AND NOT MSVC)
+diff --git a/compiler/third_party/npu_compiler/src/vpux_driver_compiler/CMakeLists.txt b/compiler/third_party/npu_compiler/src/vpux_driver_compiler/CMakeLists.txt
+index f9338e22a..ca4eeafd4 100644
+--- a/compiler/third_party/npu_compiler/src/vpux_driver_compiler/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/src/vpux_driver_compiler/CMakeLists.txt
+@@ -14,16 +14,20 @@ endif()
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+ 
+ add_subdirectory(src)
+-add_subdirectory(test)
++if(ENABLE_TESTS)
++    add_subdirectory(test)
++endif()
+ 
+-install(
+-    FILES
+-        "${PROJECT_SOURCE_DIR}/src/vpux_driver_compiler/CHANGES.txt"
+-    DESTINATION ${INSTALL_DESTINATION}
+-    COMPONENT ${INSTALL_COMPONENT})
++if(NOT BUILD_COMPILER_FOR_DRIVER)
++    install(
++        FILES
++            "${PROJECT_SOURCE_DIR}/src/vpux_driver_compiler/CHANGES.txt"
++        DESTINATION ${INSTALL_DESTINATION}
++        COMPONENT ${INSTALL_COMPONENT})
+ 
+-install(
+-    FILES
+-        "${PROJECT_SOURCE_DIR}/src/vpux_driver_compiler/README.md"
+-    DESTINATION ${INSTALL_DESTINATION}
+-    COMPONENT ${INSTALL_COMPONENT})
++    install(
++        FILES
++            "${PROJECT_SOURCE_DIR}/src/vpux_driver_compiler/README.md"
++        DESTINATION ${INSTALL_DESTINATION}
++        COMPONENT ${INSTALL_COMPONENT})
++endif()
+diff --git a/compiler/third_party/npu_compiler/tools/CMakeLists.txt b/compiler/third_party/npu_compiler/tools/CMakeLists.txt
+index ffa04c440..130b7d41e 100644
+--- a/compiler/third_party/npu_compiler/tools/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler/tools/CMakeLists.txt
+@@ -3,6 +3,11 @@
+ # SPDX-License-Identifier: Apache-2.0
+ #
+ 
++if(BUILD_COMPILER_FOR_DRIVER)
++    add_subdirectory(npureg-tblgen)
++    return()
++endif()
++
+ add_subdirectory(sol-generator)
+ add_subdirectory(query_model)
+ add_subdirectory(infer_tool)

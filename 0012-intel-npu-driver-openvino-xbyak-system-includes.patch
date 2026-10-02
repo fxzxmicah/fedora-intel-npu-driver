@@ -1,0 +1,48 @@
+diff --git a/compiler/third_party/npu_compiler_openvino/src/core/CMakeLists.txt b/compiler/third_party/npu_compiler_openvino/src/core/CMakeLists.txt
+index 23e4062531..956ed2a7ee 100644
+--- a/compiler/third_party/npu_compiler_openvino/src/core/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler_openvino/src/core/CMakeLists.txt
+@@ -51,7 +51,7 @@ target_include_directories(openvino_core_dev INTERFACE
+     $<BUILD_INTERFACE:${OpenVINO_SOURCE_DIR}/src/common/low_precision_transformations/include>)
+ 
+ target_include_directories(openvino_core_dev SYSTEM INTERFACE
+-    $<BUILD_INTERFACE:$<$<TARGET_EXISTS:xbyak::xbyak>:$<TARGET_PROPERTY:xbyak::xbyak,INTERFACE_INCLUDE_DIRECTORIES>>>)
++    $<BUILD_INTERFACE:${xbyak_INCLUDE_DIRECTORIES}>)
+ 
+ target_link_libraries(openvino_core_dev INTERFACE openvino::itt openvino::util)
+ 
+diff --git a/compiler/third_party/npu_compiler_openvino/src/inference/CMakeLists.txt b/compiler/third_party/npu_compiler_openvino/src/inference/CMakeLists.txt
+index 90d6a4b6fb..88842cada2 100644
+--- a/compiler/third_party/npu_compiler_openvino/src/inference/CMakeLists.txt
++++ b/compiler/third_party/npu_compiler_openvino/src/inference/CMakeLists.txt
+@@ -78,7 +78,7 @@ endif()
+ 
+ target_include_directories(${TARGET_NAME}_obj SYSTEM PRIVATE
+     $<TARGET_PROPERTY:openvino::pugixml,INTERFACE_INCLUDE_DIRECTORIES>
+-    $<$<TARGET_EXISTS:xbyak::xbyak>:$<TARGET_PROPERTY:xbyak::xbyak,INTERFACE_INCLUDE_DIRECTORIES>>)
++    ${xbyak_INCLUDE_DIRECTORIES})
+ 
+ target_include_directories(${TARGET_NAME}_obj PRIVATE
+     "${CMAKE_CURRENT_SOURCE_DIR}/src"
+diff --git a/compiler/third_party/npu_compiler_openvino/thirdparty/dependencies.cmake b/compiler/third_party/npu_compiler_openvino/thirdparty/dependencies.cmake
+index 76de456284..fe3fcfda5b 100644
+--- a/compiler/third_party/npu_compiler_openvino/thirdparty/dependencies.cmake
++++ b/compiler/third_party/npu_compiler_openvino/thirdparty/dependencies.cmake
+@@ -66,6 +66,17 @@ if(X86_64 OR X86 OR UNIVERSAL2)
+     else()
+         add_subdirectory(thirdparty/xbyak EXCLUDE_FROM_ALL)
+     endif()
++
++    # Do not pass compiler-implicit directories explicitly: doing so can break
++    # include_next in standard library headers. Keep actual Xbyak paths SYSTEM.
++    get_target_property(xbyak_INCLUDE_DIRECTORIES
++        xbyak::xbyak INTERFACE_INCLUDE_DIRECTORIES)
++    if(NOT xbyak_INCLUDE_DIRECTORIES)
++        message(FATAL_ERROR
++            "Xbyak target xbyak::xbyak does not provide interface include directories")
++    endif()
++    list(REMOVE_ITEM xbyak_INCLUDE_DIRECTORIES
++        ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+ endif()
+ 
+ #

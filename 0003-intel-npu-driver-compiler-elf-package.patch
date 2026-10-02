@@ -1,0 +1,69 @@
+diff --git a/compiler/npu_compiler.cmake b/compiler/npu_compiler.cmake
+index 54bdc53..ee41573 100644
+--- a/compiler/npu_compiler.cmake
++++ b/compiler/npu_compiler.cmake
+@@ -16,6 +16,8 @@ endif()
+ 
+ message(STATUS "NPU_COMPILER_PACKAGE_DIR: ${NPU_COMPILER_PACKAGE_DIR}")
+ target_include_directories(npu_compiler INTERFACE ${NPU_COMPILER_PACKAGE_DIR})
++set_property(TARGET npu_compiler PROPERTY
++  NPU_COMPILER_PACKAGE_DIR "${NPU_COMPILER_PACKAGE_DIR}")
+ 
+ 
+ # Skipping the link step on Android to avoid double loading of the compiler shared library
+diff --git a/third_party/cmake/npu_compiler_elf.cmake b/third_party/cmake/npu_compiler_elf.cmake
+index eebf2a6..bf4e873 100644
+--- a/third_party/cmake/npu_compiler_elf.cmake
++++ b/third_party/cmake/npu_compiler_elf.cmake
+@@ -14,9 +14,47 @@ endfunction()
+ get_target_property(FIRMWARE_INCLUDES fw_vpu_api_headers INTERFACE_INCLUDE_DIRECTORIES)
+ include_directories(SYSTEM ${FIRMWARE_INCLUDES})
+ 
+-set(BUILD_SHARED_LIBS ON)
+-add_subdirectory(npu_compiler_elf)
+-unset(BUILD_SHARED_LIBS)
++set(NPU_ELF_COMPILER_PACKAGE_DIR "${NPU_COMPILER_PACKAGE_DIR}")
++if(NOT NPU_ELF_COMPILER_PACKAGE_DIR AND TARGET npu_compiler)
++  get_target_property(NPU_ELF_COMPILER_PACKAGE_DIR
++    npu_compiler NPU_COMPILER_PACKAGE_DIR)
++endif()
++
++if(NPU_ELF_COMPILER_PACKAGE_DIR)
++  set(NPU_ELF_LIBRARY_PATH "${NPU_ELF_COMPILER_PACKAGE_DIR}/vpux_elf/lib/Release/libnpu_elf.a")
++  set(NPU_ELF_INCLUDE_DIRS
++    "${NPU_ELF_COMPILER_PACKAGE_DIR}/vpux_elf/core/include"
++    "${NPU_ELF_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include"
++    "${NPU_ELF_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include/common"
++    "${NPU_ELF_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include/3720"
++    "${NPU_ELF_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include/4000"
++    "${NPU_ELF_COMPILER_PACKAGE_DIR}/vpux_elf/loader/include/5000")
++
++  # Imported targets validate their interface include directories while the
++  # compiler ExternalProject creates them only during its install step.
++  if(TARGET npu_compiler_build)
++    file(MAKE_DIRECTORY ${NPU_ELF_INCLUDE_DIRS})
++  endif()
++
++  add_library(npu_elf STATIC IMPORTED GLOBAL)
++  set_target_properties(npu_elf PROPERTIES
++    IMPORTED_LOCATION "${NPU_ELF_LIBRARY_PATH}"
++    INTERFACE_INCLUDE_DIRECTORIES "${NPU_ELF_INCLUDE_DIRS}")
++
++  if(TARGET npu_compiler_build)
++    add_dependencies(npu_elf npu_compiler_build)
++  endif()
++elseif(ENABLE_NPU_ELF_BUILD)
++  set(BUILD_SHARED_LIBS ON)
++  add_subdirectory(npu_compiler_elf)
++  unset(BUILD_SHARED_LIBS)
++else()
++  message(FATAL_ERROR
++    "No NPU ELF implementation is available. Provide NPU_COMPILER_PACKAGE_DIR "
++    "or enable ENABLE_NPU_ELF_BUILD with npu_compiler_elf sources available.")
++endif()
+ 
+ # TODO: Temporary WA for linker issue with missing -fPIC. This only occurs on Linux
+-set_property(TARGET npu_elf PROPERTY POSITION_INDEPENDENT_CODE ON)
++if(ENABLE_NPU_ELF_BUILD)
++  set_property(TARGET npu_elf PROPERTY POSITION_INDEPENDENT_CODE ON)
++endif()
